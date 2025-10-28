@@ -130,12 +130,15 @@ class ALA:
     Points_ids=1001000
     Ribs_point_skip=1000
 
+    Group_ribs_name='Ribs'
     Surface_ids=10010
     Ribs_surface_skip=10    
 
+    Group_spars_name='Spars'
     Spar_ids=20010
     Ribs_spar_skip=10
 
+    Group_stringers_name='Stringers'
     Stringer_ids=300100
     Ribs_stringer_skip=100
 
@@ -339,6 +342,13 @@ class ALA:
             sub_ids_largeros=[np.argmin(np.abs(np.linspace(0,1,NACAProfile.NUMBER_POINTS)-c_loc)) for c_loc in self.spar_locations]
             sub_ids_largerillos=[np.argmin(np.abs(np.linspace(0,1,NACAProfile.NUMBER_POINTS)-c_loc)) for c_loc in self.stringer_locations]
             
+
+            #crear grupos 
+            file.write(f'ga_group_create( "{self.Group_ribs_name}" )\n')
+            file.write(f'ga_group_create( "{self.Group_spars_name}" )\n')
+            file.write(f'ga_group_create( "{self.Group_stringers_name}" )\n')
+            # file.write(f'ga_group_create( "{self.grupo_pieles}" )\n')
+
             #crear puntos
             file.write('# NASTRAN SES file for hollow wing structure\n')
             file.write('STRING asm_create_grid_xyz_created_ids[VIRTUAL]\n')
@@ -367,6 +377,13 @@ class ALA:
                 file.write('STRING sgm_surface_trimmed__created_id[VIRTUAL]\n')
                 file.write(f'sgm_create_surface_trimmed_v1( "{self.Surface_ids + int(n_rib*self.Ribs_surface_skip) + 2}", "Curve 1:{NACAProfile.NUMBER_POINTS *2 -sub_ids_largeros[1] * 2 - 2}", "", "", TRUE, TRUE, TRUE,TRUE, sgm_surface_trimmed__created_id )\n')
 
+            # añadir costillas al grupo
+            for i_spar in range(len(sub_ids_largeros)+1):
+                file.write(f'ga_group_entity_add( "{self.Group_ribs_name}","Surface {self.Surface_ids + i_spar}:{self.Surface_ids + i_spar + self.Ribs_surface_skip * ( len(self.profile_ribs()) -1 )}:{self.Ribs_surface_skip}" )\n')
+
+
+
+
             #crear superficies de los largeros entre las costillas
             file.write('STRING sgm_create_surface__created_ids[VIRTUAL]\n')
             for n_rib in range(len(self.profile_ribs()) - 1):
@@ -376,6 +393,11 @@ class ALA:
                     point_end_i=point_origin_i + NACAProfile.NUMBER_POINTS *2 - sub_ids_largeros[i_spar] * 2 - 3
 
                     file.write(f'sgm_const_surface_vertex( "{self.Spar_ids + int(n_rib*self.Ribs_spar_skip) + i_spar}", "Point {point_origin_i}", "Point {point_origin_i + self.Ribs_point_skip}", "Point {point_end_i + self.Ribs_point_skip}", "Point {point_end_i}",sgm_create_surface__created_ids )\n')
+            # añadir largeros al grupo
+            for i_spar in range(len(sub_ids_largeros)):
+                file.write(f'ga_group_entity_add( "{self.Group_spars_name}","Surface {self.Spar_ids + i_spar}:{self.Spar_ids + i_spar + self.Ribs_spar_skip * ( len(self.profile_ribs()) -2 )}" )\n')
+
+
 
             #crear perfiles largerillos
             file.write('STRING asm_create_line_pwl_created_ids[VIRTUAL]\n')
@@ -387,6 +409,10 @@ class ALA:
                 file.write(f'asm_const_line_pwl( "{self.Stringer_ids + int(n_stringer * self.Ribs_stringer_skip)}", "Point {point_origin:.0f}:{point_origin + (len(self.profile_ribs()) - 1)*self.Ribs_point_skip :.0f}:{self.Ribs_point_skip}", asm_create_line_pwl_created_ids )\n')
                 #largerillos inferiores
                 file.write(f'asm_const_line_pwl( "{self.Stringer_ids + (2 * len(sub_ids_largerillos) - n_stringer) * self.Ribs_stringer_skip}", "Point {point_end:.0f}:{point_end +(len(self.profile_ribs()) - 1)*self.Ribs_point_skip :.0f}:{self.Ribs_point_skip}", asm_create_line_pwl_created_ids )\n')    
+            
+            # añadir largerillos al grupo
+            for n_stringer in range(len(sub_ids_largerillos)*2):
+                file.write(f'ga_group_entity_add( "{self.Group_stringers_name}","Line {self.Stringer_ids + n_stringer * self.Ribs_stringer_skip}:{self.Stringer_ids + n_stringer * self.Ribs_stringer_skip + self.Ribs_stringer_skip * ( len(self.profile_ribs()) -1 )}" )\n')
 
 if __name__ == "__main__":
     ala=ALA(
