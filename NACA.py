@@ -133,8 +133,11 @@ class ALA:
     Surface_ids=10010
     Ribs_surface_skip=10    
 
-    Stringer_ids=20010
-    Ribs_stringer_skip=10
+    Spar_ids=20010
+    Ribs_spar_skip=10
+
+    Stringer_ids=300100
+    Ribs_stringer_skip=100
 
 
     def __init__(self,
@@ -145,7 +148,8 @@ class ALA:
         flinge_map:dict[float,float]={0:0,1:4},
         elevation_map:dict[float,float]={0:0,1:2},
         rib_locations:list[float]=np.linspace(0,1,5).tolist(),
-        stringer_locations:list[float]=[0.4,0.7],
+        spar_locations:list[float]=[0.4,0.7],
+        stringer_locations:list[float]=[0.1,0.2,0.3,0.5,0.6,0.8,0.9],
         map_fits:Literal['Linear','Polynomic']='Linear'
     ):
         
@@ -156,6 +160,7 @@ class ALA:
         self.flinge_map=SortedDict(flinge_map)
         self.elevation_map=SortedDict(elevation_map)
         self.rib_locations=rib_locations
+        self.spar_locations=spar_locations
         self.stringer_locations=stringer_locations
         self.map_fits=map_fits
 
@@ -331,7 +336,8 @@ class ALA:
     def export_nastran_hollow(self):
         with open('ala_hueca.ses.01','w') as file:
             
-            sub_ids_largeros=[np.argmin(np.abs(np.linspace(0,1,NACAProfile.NUMBER_POINTS)-c_loc)) for c_loc in self.stringer_locations]
+            sub_ids_largeros=[np.argmin(np.abs(np.linspace(0,1,NACAProfile.NUMBER_POINTS)-c_loc)) for c_loc in self.spar_locations]
+            sub_ids_largerillos=[np.argmin(np.abs(np.linspace(0,1,NACAProfile.NUMBER_POINTS)-c_loc)) for c_loc in self.stringer_locations]
             
             #crear puntos
             file.write('# NASTRAN SES file for hollow wing structure\n')
@@ -365,13 +371,23 @@ class ALA:
             file.write('STRING sgm_create_surface__created_ids[VIRTUAL]\n')
             for n_rib in range(len(self.profile_ribs()) - 1):
 
-                for i_stringer in range(len(sub_ids_largeros)):
-                    point_origin_i=self.Points_ids + int(n_rib*self.Ribs_point_skip) + int(sub_ids_largeros[i_stringer])
-                    point_end_i=point_origin_i + NACAProfile.NUMBER_POINTS *2 - sub_ids_largeros[i_stringer] * 2 - 3
+                for i_spar in range(len(sub_ids_largeros)):
+                    point_origin_i=self.Points_ids + int(n_rib*self.Ribs_point_skip) + int(sub_ids_largeros[i_spar])
+                    point_end_i=point_origin_i + NACAProfile.NUMBER_POINTS *2 - sub_ids_largeros[i_spar] * 2 - 3
 
-                    file.write(f'sgm_const_surface_vertex( "{self.Stringer_ids + int(n_rib*self.Ribs_stringer_skip) + i_stringer}", "Point {point_origin_i}", "Point {point_origin_i + self.Ribs_point_skip}", "Point {point_end_i + self.Ribs_point_skip}", "Point {point_end_i}",sgm_create_surface__created_ids )\n')
+                    file.write(f'sgm_const_surface_vertex( "{self.Spar_ids + int(n_rib*self.Ribs_spar_skip) + i_spar}", "Point {point_origin_i}", "Point {point_origin_i + self.Ribs_point_skip}", "Point {point_end_i + self.Ribs_point_skip}", "Point {point_end_i}",sgm_create_surface__created_ids )\n')
 
-            
+            #crear perfiles largerillos
+            file.write('STRING asm_create_line_pwl_created_ids[VIRTUAL]\n')
+            for n_stringer,i_stringer in enumerate(sub_ids_largerillos):
+
+                point_origin=self.Points_ids + i_stringer
+                point_end=self.Points_ids + (NACAProfile.NUMBER_POINTS * 2 -2) - i_stringer
+                #largerillos superiores
+                file.write(f'asm_const_line_pwl( "{self.Stringer_ids + int(n_stringer * self.Ribs_stringer_skip)}", "Point {point_origin:.0f}:{point_origin + (len(self.profile_ribs()) - 1)*self.Ribs_point_skip :.0f}:{self.Ribs_point_skip}", asm_create_line_pwl_created_ids )\n')
+                #largerillos inferiores
+                file.write(f'asm_const_line_pwl( "{self.Stringer_ids + (2 * len(sub_ids_largerillos) - n_stringer) * self.Ribs_stringer_skip}", "Point {point_end:.0f}:{point_end +(len(self.profile_ribs()) - 1)*self.Ribs_point_skip :.0f}:{self.Ribs_point_skip}", asm_create_line_pwl_created_ids )\n')    
+
 if __name__ == "__main__":
     ala=ALA(
         envergdura=20,
@@ -381,7 +397,8 @@ if __name__ == "__main__":
         flinge_map={0:0,0.25:1,1:4},
         elevation_map={0:0,1:2},
         rib_locations=np.linspace(0,1,13).tolist(),
-        stringer_locations=[0.2,0.7],
+        spar_locations=[0.2,0.7],
+        stringer_locations=[0.025,0.1,0.15,0.3,0.5,0.6,0.75,0.8,0.85,0.9],
         map_fits='Linear'
     )
     # ala.plot_profile_transition()
